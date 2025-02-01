@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+# Exit immediately if a command exits with a non-zero status
+set -e
+
+# 1) Grab the file that contains the raw commit message
+commit_msg_file="$1"
+raw_message=$(cat "$commit_msg_file")
+
+# 2) Call the Python script to rewrite the commit message
+semantic_message=$(python PATH/TO/YOUR/rewrite_commit_message.py "$raw_message")
+
+# 3) Check if the Python script returned an error message
+if [[ "$semantic_message" == "Error calling OpenAI API: Connection error." ]]; then
+    echo "Error: Unable to rewrite commit message due to API connection issues."
+    exit 1
+fi
+
+# 4) Overwrite the commit message file
+echo "$semantic_message" > "$commit_msg_file"
+
+# 5) Exit 0 to let Git know the hook succeeded
+exit 0
