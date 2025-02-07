@@ -7,6 +7,15 @@ import subprocess
 from dotenv import load_dotenv
 from openai import OpenAI, APIError
 
+# Regex pattern to detect conventional commits
+SEMANTIC_COMMIT_REGEX = re.compile(
+    r"^(feat|fix|docs|chore|refactor|style|test|build|ci|perf)(\([\w\-]+\))?!?:\s.+"
+)
+
+def is_semantic_commit(message):
+    """Check if the given commit message follows the Conventional Commit format."""
+    return bool(SEMANTIC_COMMIT_REGEX.match(message))
+
 def get_recent_scopes(max_commits=20):
     """
     Retrieve the last `max_commits` commit subjects and
@@ -90,21 +99,26 @@ def main():
 
     raw_message = " ".join(sys.argv[1:])
 
-    # 3. Retrieve the set of known scopes from recent commits
+    # 3. Check if the message is already in conventional commit format
+    if is_semantic_commit(raw_message):
+        print(raw_message)  # Print as-is and exit
+        sys.exit(0)
+
+    # 4. Retrieve the set of known scopes from recent commits
     known_scopes = get_recent_scopes(max_commits=1000)
     scopes_list = ", ".join(sorted(known_scopes)) if known_scopes else "none"
 
-    # 4. Gather local diff & detect potential break
+    # 5. Gather local diff & detect potential break
     diff_text = get_staged_diff()
     if not diff_text.strip():
         suspected_breaking = "false"
     else:
         suspected_breaking = detect_breaking_change(diff_text)
 
-    # 5. Gather staged files
+    # 6. Gather staged files
     staged_files = "\n".join(get_staged_files())
 
-    # 6. Prepare a system prompt that instructs the model
+    # 7. Prepare a system prompt that instructs the model
     system_prompt = f"""\
 You are an assistant that converts any given commit message into a Conventional Commit message.
 Follow these rules:
@@ -121,11 +135,11 @@ Changed files:
 {staged_files}
 """
 
-    # 7. Instantiate the OpenAI client
+    # 8. Instantiate the OpenAI client
     client = OpenAI(api_key=api_key)
 
     try:
-        # 8. Send the request to the Chat Completions endpoint
+        # 9. Send the request to the Chat Completions endpoint
         response = client.chat.completions.create(
             model="gpt-4o",  # from docs, or use e.g. "gpt-4" or "gpt-3.5-turbo" if supported
             messages=[
@@ -134,10 +148,10 @@ Changed files:
             ],
             temperature=0.2,
         )
-        # 9. Extract the AI-generated commit message
+        # 10. Extract the AI-generated commit message
         semantic_commit = response.choices[0].message.content.strip()
 
-        # 10. remove ``` from the response
+        # 11. remove ``` from the response
         semantic_commit = semantic_commit.replace("```\n", "")
         semantic_commit = semantic_commit.replace("\n```", "")
 
